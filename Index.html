@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Full Store</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; }
+    body { background: #f4f4f9; padding: 20px; }
+    header { display: flex; justify-space-between; align-items: center; padding: 15px 20px; background: #1e293b; color: #fff; border-radius: 8px; margin-bottom: 20px; }
+    header button { background: #3b82f6; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; }
+    .container { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+    .products-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; }
+    .card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center; }
+    .card img { max-width: 100%; height: 120px; object-fit: cover; border-radius: 4px; }
+    .card h3 { margin: 10px 0 5px; font-size: 1.1rem; }
+    .card p { color: #64748b; font-size: 0.9rem; margin-bottom: 8px; }
+    .card button { background: #10b981; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; width: 100%; }
+    .cart, .admin-panel { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .cart ul { list-style: none; margin: 15px 0; }
+    .cart li { display: flex; justify-content: space-between; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+    .admin-panel form { display: flex; flex-direction: column; gap: 10px; }
+    .admin-panel input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Full Store</h1>
+    <button onclick="toggleAdmin()">Panel Admin</button>
+  </header>
+
+  <div class="container">
+    <!-- Tienda -->
+    <div>
+      <h2>Catálogo de Productos</h2>
+      <div id="catalog" class="products-grid"></div>
+    </div>
+
+    <!-- Carrito -->
+    <div class="cart">
+      <h2>Carrito de Compras</h2>
+      <ul id="cart-list"></ul>
+      <p><strong>Total: $<span id="cart-total">0</span></strong></p>
+      <button style="margin-top:15px; background:#6366f1; color:white; border:none; padding:10px; width:100%; border-radius:4px; cursor:pointer;" onclick="checkout()">Finalizar Pedido</button>
+    </div>
+  </div>
+
+  <!-- Panel de Administración -->
+  <div id="admin" class="admin-panel hidden" style="margin-top: 20px;">
+    <h2>Panel de Administración - Cargar Producto</h2>
+    <form id="product-form" onsubmit="addProduct(event)">
+      <input type="text" id="p-name" placeholder="Nombre del producto" required>
+      <input type="number" id="p-price" placeholder="Precio ($)" required>
+      <input type="number" id="p-stock" placeholder="Stock inicial" required>
+      <input type="url" id="p-img" placeholder="URL de la imagen (Ej: https://via.placeholder.com/150)" required>
+      <button type="submit" style="background:#2563eb; color:white; border:none; padding:10px; border-radius:4px; cursor:pointer;">Guardar Producto</button>
+    </form>
+  </div>
+
+  <script>
+    let products = JSON.parse(localStorage.getItem('fs_products')) || [
+      { id: 1, name: 'Yerba Mate 1kg', price: 1500, stock: 20, img: 'https://via.placeholder.com/150' },
+      { id: 2, name: 'Pack Galletitas', price: 800, stock: 15, img: 'https://via.placeholder.com/150' }
+    ];
+    let cart = [];
+
+    function renderProducts() {
+      const catalog = document.getElementById('catalog');
+      catalog.innerHTML = '';
+      products.forEach(p => {
+        catalog.innerHTML += `
+          <div class="card">
+            <img src="${p.img}" alt="${p.name}">
+            <h3>${p.name}</h3>
+            <p>Precio: $${p.price} | Stock: ${p.stock}</p>
+            <button onclick="addToCart(${p.id})" ${p.stock <= 0 ? 'disabled style="background:#cbd5e1;"' : ''}>
+              ${p.stock > 0 ? 'Agregar al Carrito' : 'Sin Stock'}
+            </button>
+          </div>`;
+      });
+      localStorage.setItem('fs_products', JSON.stringify(products));
+    }
+
+    function addToCart(id) {
+      const prod = products.find(p => p.id === id);
+      if (prod && prod.stock > 0) {
+        prod.stock--;
+        const cartItem = cart.find(c => c.id === id);
+        if (cartItem) { cartItem.qty++; } else { cart.push({ ...prod, qty: 1 }); }
+        renderProducts();
+        renderCart();
+      }
+    }
+
+    function renderCart() {
+      const list = document.getElementById('cart-list');
+      let total = 0;
+      list.innerHTML = '';
+      cart.forEach(item => {
+        const subtotal = item.price * item.qty;
+        total += subtotal;
+        list.innerHTML += `<li>${item.name} (x${item.qty}) <span>$${subtotal}</span></li>`;
+      });
+      document.getElementById('cart-total').innerText = total;
+    }
+
+    function addProduct(e) {
+      e.preventDefault();
+      const newP = {
+        id: Date.now(),
+        name: document.getElementById('p-name').value,
+        price: parseFloat(document.getElementById('p-price').value),
+        stock: parseInt(document.getElementById('p-stock').value),
+        img: document.getElementById('p-img').value
+      };
+      products.push(newP);
+      renderProducts();
+      document.getElementById('product-form').reset();
+    }
+
+    function toggleAdmin() {
+      document.getElementById('admin').classList.toggle('hidden');
+    }
+
+    function checkout() {
+      if (cart.length === 0) return alert('El carrito está vacío');
+      alert('Pedido enviado con éxito');
+      cart = [];
+      renderCart();
+    }
+
+    renderProducts();
+  </script>
+</body>
+</html>
